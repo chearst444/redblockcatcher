@@ -53,6 +53,8 @@
   #lives{ letter-spacing:2px; }
   .pause-btn{ pointer-events:auto; cursor:pointer; border:none; color:var(--ink); font-family:inherit; }
   .pause-btn:active{ transform:translateY(2px); }
+  #speedBtn{ min-width:52px; }
+  #speedBtn.fast{ background:var(--red); color:#fff; }
 
   /* ---------- Controls ---------- */
   #controls{
@@ -102,13 +104,14 @@
 <body>
 <div id="game">
   <canvas id="c"></canvas>
-  <div id="buildTag">build 2026-09-01f</div>
+  <div id="buildTag">build 2026-09-01g</div>
 
   <div id="hud">
     <div id="cluePanel"><span class="lbl">Catch</span><span class="clue" id="clueText"></span></div>
     <div id="centerHud">
       <div class="row">
         <div class="pill" id="level">Level 1</div>
+        <button class="pill pause-btn" id="speedBtn" aria-label="Toggle speed">▶ 1x</button>
         <button class="pill pause-btn" id="pauseBtn" aria-label="Pause">⏸</button>
       </div>
       <div id="progressWrap"><div id="progressFill"></div></div>
@@ -128,7 +131,7 @@
 </div>
 
 <!-- DATA FILE: the only file you edit to change the game's content. -->
-<script src="catcher_words.js?v=20260901f"></script>
+<script src="catcher_words.js?v=20260901g"></script>
 <script>
 (function(){
   // ================================================================
@@ -158,6 +161,7 @@
   var livesEl=document.getElementById('lives');
   var progressFill=document.getElementById('progressFill');
   var overlay=document.getElementById('overlay'), card=document.getElementById('card');
+  var speedBtn=document.getElementById('speedBtn');
   var leftBtn=document.getElementById('leftBtn'), rightBtn=document.getElementById('rightBtn');
 
   // ---- layout ----
@@ -173,6 +177,7 @@
   var builderX=0, leftDown=false, rightDown=false;
   var running=false, paused=false, spawnAcc=0;
   var flashT=0;       // brief red flash on a wrong catch
+  var speedMult=1;    // 1x or 2x — toggled in-game by the player
 
   var TILE_PALETTE=['#3b82f6','#a855f7','#06b6d4','#f59e0b','#ec4899','#6366f1','#0ea5e9','#8b5cf6'];
   function tileColor(text){
@@ -367,7 +372,16 @@
   }
 
   function difficulty(){
-    return { fall: 90 + level*16, spawn: Math.max(2200 - level*90, 1400) };
+    // spawn interval divides by the same multiplier as fall speed, so
+    // the visual rhythm (gap vs. fall time) stays the same at 2x — it
+    // just all happens twice as fast, rather than tiles bunching up.
+    return { fall: (90 + level*16)*speedMult, spawn: Math.max(2200 - level*90, 1400)/speedMult };
+  }
+
+  function toggleSpeed(){
+    speedMult = (speedMult===1) ? 2 : 1;
+    speedBtn.textContent = (speedMult===2 ? '⏩ 2x' : '▶ 1x');
+    speedBtn.classList.toggle('fast', speedMult===2);
   }
 
   // ================================================================
@@ -464,7 +478,7 @@
       '<p>Read the clue, then catch the <b>correctly spelled</b> word as it falls!<br>'+
       'Watch out — some falling words are <b>misspelled</b>. Catching one costs a life. ❤️<br>'+
       'Catch the right spelling to move on to the next word.</p>'+
-      '<p style="font-size:0.9em;opacity:0.8">Use the ◀ ▶ buttons or arrow keys. Space to pause.</p>'+
+      '<p style="font-size:0.9em;opacity:0.8">Use the ◀ ▶ buttons or arrow keys. Space to pause.<br>Tap ▶1x during play to speed things up to 2x.</p>'+
       '<button class="big-btn" id="playBtn">Play!</button>'
     );
     document.getElementById('playBtn').onclick=function(){ unlockAudio(); startGame(); };
@@ -556,6 +570,7 @@
   hold(leftBtn,function(v){ leftDown=v; });
   hold(rightBtn,function(v){ rightDown=v; });
   document.getElementById('pauseBtn').addEventListener('click', togglePause);
+  speedBtn.addEventListener('click', toggleSpeed);
 
   // ================================================================
   // Audio (tiny procedural blips)
