@@ -119,7 +119,7 @@
 </div>
 
 <!-- DATA FILE: the only file you edit to change the game's content. -->
-<script src="catcher_words.js"></script>
+<script src="catcher_words.js?v=20260901c"></script>
 <script>
 (function(){
   // ================================================================
@@ -257,12 +257,27 @@
   // ================================================================
   // Spawning & catching
   // ================================================================
+  // Falling tiles use fixed lanes (one per MAX_FALLING slot) so
+  // concurrent tiles never bunch up on top of each other.
+  function laneCenter(lane){
+    var usable=Math.max(1,W-cell*2-40), laneW=usable/MAX_FALLING;
+    return cell+20+laneW*(lane+0.5);
+  }
+  function freeLane(){
+    var used={};
+    for(var i=0;i<items.length;i++) used[items[i].lane]=true;
+    var free=[];
+    for(var l=0;l<MAX_FALLING;l++) if(!used[l]) free.push(l);
+    if(!free.length) return (Math.random()*MAX_FALLING)|0;   // shouldn't happen — spawn is gated on room
+    return free[(Math.random()*free.length)|0];
+  }
   function spawnItem(){
     var correct = Math.random()<0.42;    // make sure the right spelling shows up often
     var text;
     if(correct) text=curWord;
     else text=curItem.decoys[(Math.random()*curItem.decoys.length)|0];
-    items.push({ text:text, correct:correct, cx: cell+20+Math.random()*Math.max(1,W-cell*2-40), cy:-cell });
+    var lane=freeLane();
+    items.push({ text:text, correct:correct, cx: laneCenter(lane), cy:-cell, lane:lane });
   }
 
   function catchItem(it){
