@@ -14,7 +14,7 @@ window.RBB_DATA = {
     clueLabel: "What it means",
     answerNoun: "word",
     pointsPerCatch: 10,
-    catchesNeeded: 3,     // correct catches needed to finish a word
+    catchesNeeded: 1,     // correct catches needed to finish a word
     startLives: 3
   },
   levels: [

@@ -12,10 +12,10 @@ build step, no dependencies.
 
 - A clue (definition + part of speech) is shown for a hidden word —
   the spelling itself isn't given, that's what you're catching.
-- Words fall from the top. Move the red block with the ◀ ▶ buttons
-  or the arrow keys to catch them.
-- Catch the **correct spelling** 3 times to finish the word and move
-  on. Catching a **misspelled decoy costs a life** (❤️❤️❤️ to start).
+- Words fall from the top, at most 3 at a time. Move the red block
+  with the ◀ ▶ buttons or the arrow keys to catch them.
+- Catch the **correct spelling** to finish the word and move on.
+  Catching a **misspelled decoy costs a life** (❤️❤️❤️ to start).
   Letting either kind fall past is free — no penalty for a miss.
 - Run out of lives and the game restarts from the beginning after a
   friendly pause.
