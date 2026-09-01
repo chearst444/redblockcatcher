@@ -138,7 +138,8 @@
 
   // ---- content (filled once data loads) ----
   var DATA=null, META={}, LEVELS=[];
-  var POINTS_PER_CATCH=10, CATCHES_NEEDED=3, START_LIVES=3;
+  var POINTS_PER_CATCH=10, CATCHES_NEEDED=1, START_LIVES=3;
+  var MAX_FALLING=3;   // at most this many word tiles fall at once
   var CLUE_LABEL='What it means', ANSWER_NOUN='word', GAME_TITLE='Red Block Catcher';
 
   // ---- DOM ----
@@ -205,7 +206,7 @@
     DATA=d; META=d.meta||{};
     LEVELS=d.levels||[];
     POINTS_PER_CATCH=META.pointsPerCatch||10;
-    CATCHES_NEEDED=META.catchesNeeded||3;
+    CATCHES_NEEDED=META.catchesNeeded||1;
     START_LIVES=META.startLives||3;
     CLUE_LABEL=META.clueLabel||'What it means';
     ANSWER_NOUN=META.answerNoun||'word';
@@ -305,8 +306,10 @@
       builderX = Math.min(Math.max(builderX, builderW/2), W-builderW/2);
 
       var d=difficulty();
-      spawnAcc += dt;
-      if(spawnAcc >= d.spawn){ spawnAcc -= d.spawn; spawnItem(); }
+      if(items.length < MAX_FALLING){                     // only tick the spawn timer while there's room
+        spawnAcc += dt;
+        if(spawnAcc >= d.spawn){ spawnAcc -= d.spawn; spawnItem(); }
+      }
 
       for(var i=items.length-1;i>=0;i--){
         if(!running) break;   // word finished / life lost to zero mid-loop — stop treating tiles as catches
@@ -424,7 +427,7 @@
       '<h1>'+esc(GAME_TITLE)+'</h1>'+
       '<p>Read the clue, then catch the <b>correctly spelled</b> word as it falls!<br>'+
       'Watch out — some falling words are <b>misspelled</b>. Catching one costs a life. ❤️<br>'+
-      'Catch the right spelling <b>'+CATCHES_NEEDED+' times</b> to finish each word.</p>'+
+      'Catch the right spelling to move on to the next word.</p>'+
       '<p style="font-size:0.9em;opacity:0.8">Use the ◀ ▶ buttons or arrow keys. Space to pause.</p>'+
       '<button class="big-btn" id="playBtn">Play!</button>'
     );
