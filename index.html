@@ -452,7 +452,11 @@
       '<div class="bigword">'+esc(curWord)+'</div>'+ s +
       '<button class="big-btn" id="nextBtn">Next</button>'
     );
-    document.getElementById('nextBtn').onclick=nextWord;
+    // moves on by itself — the Next button just lets an impatient player skip the wait
+    var advanced=false;
+    function advance(){ if(advanced) return; advanced=true; nextWord(); }
+    document.getElementById('nextBtn').onclick=advance;
+    setTimeout(advance, 1800);
   }
 
   function showLevelDone(){
