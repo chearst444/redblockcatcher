@@ -1,12 +1,533 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>redblockcatcher</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Red Block Catcher</title>
+<style>
+  :root{ --red:#ef4444; --red-dark:#c81e1e; --ink:#2b3a55; --good:#22c55e; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    overflow:hidden; touch-action:none;
+    font-family:'Comic Sans MS','Baloo','Trebuchet MS','Verdana',sans-serif;
+    background:#bfe8ff; color:var(--ink);
+  }
+  #game{ position:relative; width:100%; height:100vh; height:100dvh; overflow:hidden; }
+  canvas#c{ position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:absolute; top:0; left:0; right:0; z-index:5;
+    display:flex; align-items:flex-start; gap:10px;
+    padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+    pointer-events:none;
+  }
+  .pill{
+    background:rgba(255,255,255,0.9); border-radius:16px; padding:6px 14px;
+    font-weight:bold; font-size:clamp(13px,3.4vw,18px);
+    box-shadow:0 3px 0 rgba(0,0,0,0.08); white-space:nowrap;
+  }
+  /* top-left: the clue for the word being hunted */
+  #cluePanel{
+    background:rgba(255,255,255,0.9); border-radius:16px;
+    padding:6px 14px; box-shadow:0 3px 0 rgba(0,0,0,0.08);
+    max-width:34vw; min-width:0;
+  }
+  #cluePanel .lbl{ font-size:clamp(10px,2.4vw,13px); color:#7c8aa5; font-weight:bold; display:block; }
+  #cluePanel .clue{ font-size:clamp(12px,3vw,15px); font-weight:bold; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  #centerHud{
+    flex:1 1 auto; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0;
+  }
+  #centerHud .row{ display:flex; align-items:center; gap:8px; }
+  #progressWrap{
+    width:min(40vw,260px); height:14px; background:rgba(255,255,255,0.7);
+    border-radius:10px; overflow:hidden; box-shadow:inset 0 2px 4px rgba(0,0,0,0.12);
+  }
+  #progressFill{ height:100%; width:0%; background:linear-gradient(90deg,#fca5a5,var(--red)); border-radius:10px; transition:width 0.25s ease; }
+  #rightHud{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  #score{ color:#f59e0b; }
+  #lives{ letter-spacing:2px; }
+  .pause-btn{ pointer-events:auto; cursor:pointer; border:none; color:var(--ink); font-family:inherit; }
+  .pause-btn:active{ transform:translateY(2px); }
+
+  /* ---------- Controls ---------- */
+  #controls{
+    position:absolute; left:0; right:0; bottom:0; z-index:5;
+    display:flex; justify-content:space-between;
+    padding:0 16px calc(16px + env(safe-area-inset-bottom)); pointer-events:none;
+  }
+  .ctrl-btn{
+    pointer-events:auto; width:88px; height:88px; border:none; border-radius:24px;
+    background:rgba(255,255,255,0.9); color:var(--red); font-size:44px; line-height:1;
+    font-family:inherit; box-shadow:0 5px 0 rgba(0,0,0,0.12); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; touch-action:none;
+  }
+  .ctrl-btn:active{ transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,0.12); background:#ffe9e9; }
+
+  /* ---------- Overlays ---------- */
+  #overlay{
+    position:absolute; inset:0; z-index:10;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:24px;
+    background:rgba(40,80,140,0.35); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+  }
+  #overlay.hidden{ display:none; }
+  .card{
+    background:#fff; border-radius:28px; padding:24px 26px 28px;
+    box-shadow:0 12px 30px rgba(20,40,80,0.3); max-width:460px; width:100%;
+  }
+  .card h1{ margin:0 0 6px; font-size:clamp(22px,6.5vw,38px); color:var(--red); line-height:1.1; }
+  .card h1 .sub{ display:block; color:var(--ink); font-size:0.5em; margin-top:4px; }
+  .card .bigword{ font-size:clamp(28px,8.5vw,48px); font-weight:bold; color:var(--ink); letter-spacing:2px; margin:6px 0 2px; }
+  .card .pos{ font-style:italic; color:#7c8aa5; margin:0 0 8px; font-size:clamp(13px,3.2vw,16px); }
+  .card p{ margin:8px 0 16px; font-size:clamp(14px,3.6vw,18px); color:var(--ink); }
+  .card .clue-label{ font-weight:bold; color:#f59e0b; text-transform:uppercase; font-size:12px; letter-spacing:1px; margin-bottom:2px; }
+  .card .sentence{ font-style:italic; }
+  .big-btn{
+    border:none; font-family:inherit; font-weight:bold; font-size:clamp(18px,5vw,26px); color:#fff;
+    background:linear-gradient(180deg,#ff6b6b,var(--red)); padding:14px 34px; border-radius:22px;
+    box-shadow:0 6px 0 var(--red-dark); cursor:pointer;
+  }
+  .big-btn:active{ transform:translateY(4px); box-shadow:0 2px 0 var(--red-dark); }
+</style>
 </head>
 <body>
-  <h1>redblockcatcher</h1>
-  <p>GitHub Pages is working — this is the site index.</p>
+<div id="game">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div id="cluePanel"><span class="lbl">Catch</span><span class="clue" id="clueText"></span></div>
+    <div id="centerHud">
+      <div class="row">
+        <div class="pill" id="level">Level 1</div>
+        <button class="pill pause-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+      </div>
+      <div id="progressWrap"><div id="progressFill"></div></div>
+    </div>
+    <div id="rightHud">
+      <div class="pill" id="score">0</div>
+      <div class="pill" id="lives"></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="leftBtn" aria-label="Move left">◀</button>
+    <button class="ctrl-btn" id="rightBtn" aria-label="Move right">▶</button>
+  </div>
+
+  <div id="overlay"><div class="card" id="card"></div></div>
+</div>
+
+<!-- DATA FILE: the only file you edit to change the game's content. -->
+<script src="catcher_words.js"></script>
+<script>
+(function(){
+  // ================================================================
+  // Red Block Catcher — reusable engine.
+  // ALL content (words/decoys/clues/sentences/levels/points/lives)
+  // comes from the data file. There is no subject-specific logic
+  // below — swap the data file for a different subject and this
+  // same engine runs it unchanged.
+  //
+  // Rule: a clue for a target word is shown, but NOT its spelling.
+  // Falling tiles carry the correctly-spelled word and several
+  // misspelled decoys. Catch the correct spelling enough times to
+  // finish the word; catching a decoy costs a life. Missing either
+  // kind (letting it fall past) has no penalty.
+  // ================================================================
+
+  // ---- content (filled once data loads) ----
+  var DATA=null, META={}, LEVELS=[];
+  var POINTS_PER_CATCH=10, CATCHES_NEEDED=3, START_LIVES=3;
+  var CLUE_LABEL='What it means', ANSWER_NOUN='word', GAME_TITLE='Red Block Catcher';
+
+  // ---- DOM ----
+  var canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+  var clueTextEl=document.getElementById('clueText');
+  var scoreEl=document.getElementById('score'), levelEl=document.getElementById('level');
+  var livesEl=document.getElementById('lives');
+  var progressFill=document.getElementById('progressFill');
+  var overlay=document.getElementById('overlay'), card=document.getElementById('card');
+  var leftBtn=document.getElementById('leftBtn'), rightBtn=document.getElementById('rightBtn');
+
+  // ---- layout ----
+  var W=0,H=0,dpr=1;
+  var cell=40, builderW=60, builderH=44, builderTopY=0, catchLineY=0, groundY=0;
+
+  // ---- state ----
+  var level=0, score=0, wordIndex=0, lives=3;
+  var curItem=null, curWord='';
+  var catchesGot=0;
+  var items=[];      // falling word tiles: {text,correct,cx,cy,w,h,color}
+  var particles=[];
+  var builderX=0, leftDown=false, rightDown=false;
+  var running=false, paused=false, spawnAcc=0;
+  var flashT=0;       // brief red flash on a wrong catch
+
+  var TILE_PALETTE=['#3b82f6','#a855f7','#06b6d4','#f59e0b','#ec4899','#6366f1','#0ea5e9','#8b5cf6'];
+  function tileColor(text){
+    var h=0; for(var i=0;i<text.length;i++) h=(h*31+text.charCodeAt(i))|0;
+    return TILE_PALETTE[((h%TILE_PALETTE.length)+TILE_PALETTE.length)%TILE_PALETTE.length];
+  }
+
+  // ================================================================
+  // Sizing
+  // ================================================================
+  function fit(){
+    dpr=window.devicePixelRatio||1; W=window.innerWidth; H=window.innerHeight;
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    cell=Math.max(26, Math.min(W*0.11, H*0.085, 46));
+    builderW=cell*1.7; builderH=cell*1.15;
+    groundY=H-Math.max(18,H*0.03);
+    builderTopY=groundY-builderH;
+    catchLineY=builderTopY+builderH*0.35;   // roughly the builder's mouth
+    builderX=Math.min(Math.max(builderX||W/2, builderW/2), W-builderW/2);
+  }
+  window.addEventListener('resize', fit);
+
+  // ================================================================
+  // Content loading (data-driven, no subject logic)
+  // ================================================================
+  function loadData(){
+    return new Promise(function(resolve,reject){
+      if(window.RBB_DATA){ resolve(window.RBB_DATA); return; }
+      if(window.fetch){
+        fetch('catcher_words.json').then(function(r){
+          if(!r.ok) throw new Error('http '+r.status); return r.json();
+        }).then(resolve).catch(reject);
+      } else reject(new Error('no data'));
+    });
+  }
+  function applyData(d){
+    DATA=d; META=d.meta||{};
+    LEVELS=d.levels||[];
+    POINTS_PER_CATCH=META.pointsPerCatch||10;
+    CATCHES_NEEDED=META.catchesNeeded||3;
+    START_LIVES=META.startLives||3;
+    CLUE_LABEL=META.clueLabel||'What it means';
+    ANSWER_NOUN=META.answerNoun||'word';
+    GAME_TITLE=META.title||'Red Block Catcher';
+  }
+  function levelWords(){ return (LEVELS[level] && LEVELS[level].words) || []; }
+
+  // ================================================================
+  // Game flow
+  // ================================================================
+  function startGame(){ level=0; score=0; lives=START_LIVES; startLevel(0); }
+
+  function startLevel(n){ level=n; wordIndex=0; updateHud(); introWord(); }
+
+  function introWord(){
+    running=false; paused=false;
+    curItem=levelWords()[wordIndex];
+    curWord=String(curItem.word).toLowerCase();
+    catchesGot=0; items=[]; particles=[];
+    updateHud();
+    showIntro();
+  }
+
+  function beginWord(){
+    running=true; paused=false; spawnAcc=0;
+    hideOverlay();
+    spawnItem();
+  }
+
+  function wordComplete(){
+    running=false;
+    sparkle(builderX, builderTopY, 26);
+    beep([523,659,784,1047], 0.12);
+    setTimeout(showSentence, 650);
+  }
+
+  function nextWord(){
+    wordIndex++;
+    if(wordIndex >= levelWords().length) levelDone();
+    else introWord();
+  }
+
+  function levelDone(){
+    if(level >= LEVELS.length-1) showWin();
+    else showLevelDone();
+  }
+
+  // ================================================================
+  // Spawning & catching
+  // ================================================================
+  function spawnItem(){
+    var correct = Math.random()<0.42;    // make sure the right spelling shows up often
+    var text;
+    if(correct) text=curWord;
+    else text=curItem.decoys[(Math.random()*curItem.decoys.length)|0];
+    items.push({ text:text, correct:correct, cx: cell+20+Math.random()*Math.max(1,W-cell*2-40), cy:-cell });
+  }
+
+  function catchItem(it){
+    if(it.correct){
+      catchesGot++;
+      score += POINTS_PER_CATCH;
+      updateHud();
+      catchPuff(it.cx, catchLineY); sparkle(builderX, catchLineY-cell*0.3, 10);
+      beep([660], 0.06);
+      if(catchesGot >= CATCHES_NEEDED) wordComplete();
+    } else {
+      loseLife();
+    }
+  }
+
+  function loseLife(){
+    lives=Math.max(0, lives-1);
+    updateHud();
+    flashT=220;
+    beep([392,262], 0.1);
+    if(lives<=0) gameLost();
+  }
+
+  // ================================================================
+  // Particles
+  // ================================================================
+  function catchPuff(x,y){ for(var i=0;i<8;i++) particles.push(P(x,y,(Math.random()-0.5)*3,-Math.random()*2-0.5,'#ffffff',3+Math.random()*3,500)); }
+  function sparkle(x,y,count){ for(var i=0;i<(count||16);i++){ var a=Math.random()*6.28,s=1.5+Math.random()*3.5; particles.push(P(x,y,Math.cos(a)*s,Math.sin(a)*s,'#ffd54a',3+Math.random()*3,700)); } }
+  function P(x,y,vx,vy,color,size,life){ return {x:x,y:y,vx:vx,vy:vy,color:color,size:size,life:0,max:life}; }
+
+  // ================================================================
+  // Update
+  // ================================================================
+  function update(dt){
+    if(paused) return;
+    if(flashT>0) flashT=Math.max(0,flashT-dt);
+
+    if(running){
+      var dir=(rightDown?1:0)-(leftDown?1:0);
+      builderX += dir*380*dt/1000;
+      builderX = Math.min(Math.max(builderX, builderW/2), W-builderW/2);
+
+      var d=difficulty();
+      spawnAcc += dt;
+      if(spawnAcc >= d.spawn){ spawnAcc -= d.spawn; spawnItem(); }
+
+      for(var i=items.length-1;i>=0;i--){
+        if(!running) break;   // word finished / life lost to zero mid-loop — stop treating tiles as catches
+        var it=items[i];
+        it.cy += d.fall*dt/1000;
+        var halfW=tileHalfWidth(it.text);
+        var aligned = Math.abs(it.cx-builderX) <= builderW/2 + halfW*0.6;
+        if(aligned && it.cy >= catchLineY){                 // reached the builder's mouth
+          catchItem(it); items.splice(i,1); continue;
+        }
+        if(it.cy > groundY+cell){ items.splice(i,1); }      // missed — lands past, no penalty
+      }
+    }
+
+    for(var p=particles.length-1;p>=0;p--){
+      var q=particles[p]; q.life+=dt; q.x+=q.vx*dt/16.7; q.y+=q.vy*dt/16.7;
+      if(q.life>=q.max) particles.splice(p,1);
+    }
+  }
+
+  function difficulty(){
+    return { fall: 90 + level*16, spawn: Math.max(1050 - level*55, 560) };
+  }
+
+  // ================================================================
+  // Render
+  // ================================================================
+  var clouds=[{x:0.16,y:0.14,s:1},{x:0.62,y:0.09,s:1.3},{x:0.83,y:0.2,s:0.9}];
+  function tileHalfWidth(text){
+    ctx.font=tileFont();
+    return Math.max(cell*0.7, ctx.measureText(text).width/2 + cell*0.35);
+  }
+  function tileFont(){ return 'bold '+Math.round(cell*0.42)+"px 'Comic Sans MS','Trebuchet MS',sans-serif"; }
+
+  function render(){
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#8fd4ff'); g.addColorStop(0.6,'#c7ecff'); g.addColorStop(1,'#eafaff');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    ctx.fillStyle='#fff3b0'; ctx.beginPath(); ctx.arc(W*0.9,H*0.1,Math.min(W,H)*0.06,0,6.28); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.9)'; clouds.forEach(function(c){ drawCloud(W*c.x,H*c.y,26*c.s); });
+
+    ctx.fillStyle='#8fe08f'; ctx.fillRect(0,groundY,W,H-groundY);
+    ctx.fillStyle='rgba(0,0,0,0.05)'; ctx.fillRect(0,groundY,W,4);
+
+    // falling word tiles
+    for(var f=0;f<items.length;f++){ var it=items[f]; drawTile(it.cx,it.cy,it.text); }
+
+    // the red catcher
+    drawBuilder(builderX, builderTopY);
+
+    for(var p=0;p<particles.length;p++){ var q=particles[p]; ctx.globalAlpha=Math.max(0,1-q.life/q.max); ctx.fillStyle=q.color; ctx.beginPath(); ctx.arc(q.x,q.y,q.size,0,6.28); ctx.fill(); }
+    ctx.globalAlpha=1;
+
+    if(flashT>0){ ctx.fillStyle='rgba(239,68,68,'+(0.28*flashT/220)+')'; ctx.fillRect(0,0,W,H); }
+  }
+
+  function drawCloud(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,6.28); ctx.arc(x+r,y+6,r*0.8,0,6.28); ctx.arc(x-r,y+6,r*0.8,0,6.28); ctx.arc(x+r*0.2,y-r*0.5,r*0.7,0,6.28); ctx.fill(); }
+
+  function drawTile(cx,cy,text){
+    var hw=tileHalfWidth(text), w=hw*2, h=cell*0.86;
+    var x=cx-w/2, y=cy-h/2, color=tileColor(text);
+    ctx.save();
+    ctx.fillStyle=color; roundRect(x,y,w,h,h*0.4); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,0.28)'; roundRect(x+w*0.08,y+h*0.12,w*0.84,h*0.28,h*0.16); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font=tileFont();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(text, cx, cy+h*0.04);
+  }
+
+  function drawBuilder(cx, topY){
+    var w=builderW, h=builderH, x=cx-w/2, y=topY;
+    ctx.fillStyle='#ef4444'; roundRect(x,y,w,h,12); ctx.fill();
+    ctx.fillStyle='#c81e1e'; roundRect(x,y+h*0.7,w,h*0.3,12); ctx.fill();
+    ctx.fillStyle='#ef4444'; roundRect(x,y,w,h*0.78,12); ctx.fill();
+    ctx.fillStyle='#fff'; var ex=w*0.24, ey=y+h*0.4, er=h*0.14;
+    ctx.beginPath(); ctx.arc(cx-ex,ey,er,0,6.28); ctx.arc(cx+ex,ey,er,0,6.28); ctx.fill();
+    ctx.fillStyle='#2b3a55'; ctx.beginPath(); ctx.arc(cx-ex,ey,er*0.5,0,6.28); ctx.arc(cx+ex,ey,er*0.5,0,6.28); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(2,h*0.06); ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx, y+h*0.52, w*0.18, 0.15*3.14, 0.85*3.14); ctx.stroke();
+  }
+
+  function roundRect(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  // ================================================================
+  // HUD
+  // ================================================================
+  function updateHud(){
+    levelEl.textContent='Level '+(level+1);
+    scoreEl.textContent=score;
+    livesEl.textContent='❤️'.repeat(lives)+'🤍'.repeat(Math.max(0,START_LIVES-lives));
+    var total=levelWords().length||1;
+    progressFill.style.width=Math.min(100,(wordIndex/total)*100)+'%';
+    if(curItem) clueTextEl.textContent=curItem.definition||'';
+  }
+
+  // ================================================================
+  // Loop
+  // ================================================================
+  var last=null;
+  function frame(ts){ if(last===null)last=ts; var dt=Math.min(ts-last,40); last=ts; update(dt); render(); requestAnimationFrame(frame); }
+
+  // ================================================================
+  // Overlays
+  // ================================================================
+  function hideOverlay(){ overlay.classList.add('hidden'); }
+  function showOverlay(html){ card.innerHTML=html; overlay.classList.remove('hidden'); }
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+  function showTitle(){
+    showOverlay(
+      '<h1>'+esc(GAME_TITLE)+'</h1>'+
+      '<p>Read the clue, then catch the <b>correctly spelled</b> word as it falls!<br>'+
+      'Watch out — some falling words are <b>misspelled</b>. Catching one costs a life. ❤️<br>'+
+      'Catch the right spelling <b>'+CATCHES_NEEDED+' times</b> to finish each word.</p>'+
+      '<p style="font-size:0.9em;opacity:0.8">Use the ◀ ▶ buttons or arrow keys. Space to pause.</p>'+
+      '<button class="big-btn" id="playBtn">Play!</button>'
+    );
+    document.getElementById('playBtn').onclick=function(){ unlockAudio(); startGame(); };
+  }
+
+  function showIntro(){
+    var pos=curItem.partOfSpeech? '<div class="pos">'+esc(curItem.partOfSpeech)+'</div>':'';
+    showOverlay(
+      '<h1 style="font-size:clamp(18px,5vw,26px)">Which spelling is right?</h1>'+
+      pos+
+      '<div class="clue-label">'+esc(CLUE_LABEL)+'</div><p>'+esc(curItem.definition)+'</p>'+
+      '<button class="big-btn" id="startBtn">Catch it!</button>'
+    );
+    document.getElementById('startBtn').onclick=beginWord;
+  }
+
+  function showSentence(){
+    var s=curItem.sentence? '<div class="clue-label">Example</div><p class="sentence">'+esc(curItem.sentence)+'</p>':'';
+    showOverlay(
+      '<h1>That\'s it! 🎉</h1>'+
+      '<div class="bigword">'+esc(curWord)+'</div>'+ s +
+      '<button class="big-btn" id="nextBtn">Next</button>'
+    );
+    document.getElementById('nextBtn').onclick=nextWord;
+  }
+
+  function showLevelDone(){
+    showOverlay(
+      '<h1>Level '+(level+1)+' done! 🌟</h1>'+
+      '<p>Great catching!<br>Score: <b>'+score+'</b></p>'+
+      '<button class="big-btn" id="nextLvlBtn">Next Level →</button>'
+    );
+    document.getElementById('nextLvlBtn').onclick=function(){ startLevel(level+1); };
+  }
+
+  function showWin(){
+    showOverlay(
+      '<h1>You did it! 🏆</h1>'+
+      '<p>You caught every '+esc(ANSWER_NOUN)+' in all '+LEVELS.length+' levels!<br>'+
+      'Final score: <b>'+score+'</b><br>You are a Spelling Champ! 📚</p>'+
+      '<button class="big-btn" id="againBtn">Play Again</button>'
+    );
+    document.getElementById('againBtn').onclick=startGame;
+  }
+
+  function gameLost(){
+    running=false; paused=false;
+    beep([392,330,262], 0.16);          // soft, friendly "aww"
+    showOverlay(
+      '<h1 style="color:#f59e0b">Oh no! 🧱</h1>'+
+      '<p>Out of hearts.<br>Starting a new game…</p>'
+    );
+    setTimeout(startGame, 3000);         // 3-second pause, then restart from the beginning
+  }
+
+  function showLoadError(){
+    showOverlay('<h1 style="color:#f59e0b">Couldn\'t load words</h1>'+
+      '<p>Make sure <b>catcher_words.js</b> is in the same folder as this file.</p>');
+  }
+
+  // ---- pause ----
+  function togglePause(){ if(!running) return; paused=!paused; if(paused) showPause(); else hideOverlay(); }
+  function showPause(){
+    showOverlay('<h1>Paused ⏸</h1><p>Press <b>Space</b> or tap Resume to keep catching.</p>'+
+      '<button class="big-btn" id="resumeBtn">Resume</button>');
+    document.getElementById('resumeBtn').onclick=togglePause;
+  }
+
+  // ================================================================
+  // Input
+  // ================================================================
+  window.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){ leftDown=true; e.preventDefault(); }
+    if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){ rightDown=true; e.preventDefault(); }
+    if(e.key===' '||e.code==='Space'){ e.preventDefault(); togglePause(); }
+  });
+  window.addEventListener('keyup',function(e){
+    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') leftDown=false;
+    if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') rightDown=false;
+  });
+  function hold(btn,set){
+    btn.addEventListener('pointerdown',function(e){ e.preventDefault(); set(true); });
+    ['pointerup','pointerleave','pointercancel'].forEach(function(ev){ btn.addEventListener(ev,function(){ set(false); }); });
+  }
+  hold(leftBtn,function(v){ leftDown=v; });
+  hold(rightBtn,function(v){ rightDown=v; });
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+  // ================================================================
+  // Audio (tiny procedural blips)
+  // ================================================================
+  var actx=null;
+  function unlockAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx&&actx.state==='suspended') actx.resume(); }
+  function beep(freqs,dur){ if(!actx) return; var t=actx.currentTime; freqs.forEach(function(f,i){ var o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.value=f; var s=t+i*0.07; g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.22,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+dur+0.05); o.connect(g).connect(actx.destination); o.start(s); o.stop(s+dur+0.08); }); }
+
+  // ================================================================
+  // Go
+  // ================================================================
+  fit();
+  loadData().then(function(d){ applyData(d); livesEl.textContent='❤️'.repeat(START_LIVES); showTitle(); requestAnimationFrame(frame); })
+            .catch(function(e){ showLoadError(); });
+})();
+</script>
 </body>
 </html>
