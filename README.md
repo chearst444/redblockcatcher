@@ -14,6 +14,8 @@ build step, no dependencies.
   the spelling itself isn't given, that's what you're catching.
 - Words fall from the top, at most 3 at a time. Move the red block
   with the ◀ ▶ buttons or the arrow keys to catch them.
+- Tap the **▶1x / ⏩2x** button any time during play to double the
+  fall speed, and tap it again to go back to normal.
 - Catch the **correct spelling** to finish the word and move on.
   Catching a **misspelled decoy costs a life** (❤️❤️❤️ to start).
   Letting either kind fall past is free — no penalty for a miss.
